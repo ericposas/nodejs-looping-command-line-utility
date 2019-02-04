@@ -1,0 +1,81 @@
+#!/usr/bin/env node
+
+const fs = require('fs');
+const spawn = require('child_process').spawn;
+const _file = process.argv[2];
+const text_content = process.argv[3];
+const num_loops = process.argv[4];
+
+if(!_file){
+  console.log('please specify a file')
+  return
+}
+if(!text_content){
+  console.log('please specify text content to write')
+  return
+}
+if(!num_loops){
+  console.log('please specify the number of times you\'d like to write the text content')
+  return
+}
+
+
+open(_file, text_content, num_loops)
+  .then( obj => {
+    for(let i = 0; i<obj.loops-1; i++){
+      obj.content += obj.default_content;
+    }
+    return Promise.resolve(obj)
+  })
+  .then( obj => {
+    console.log( obj.msg );
+    return write(obj)
+  })
+  .then( obj => wordCount(obj) )
+  .then( data => console.log(data.toString()) )
+  .catch(e=>console.log(e));
+
+
+function wordCount(obj){
+  return new Promise((resolve,reject)=>{
+    let wc = spawn('wc', [ '-w', obj.file ]);
+    wc.stdout.on('data', data=>{
+      resolve(data)
+    });
+    wc.stderr.on('data', err=>{
+      reject(err)
+    })
+    wc.on('close', data=>{
+      console.log(`child_process exited with code ${data}`);
+    });
+  })
+}
+
+function open(file, content, loops){
+  return new Promise((resolve,reject)=>{
+    fs.open(file, 'a', (e,fd)=>{
+      if(!e){
+        resolve({
+          fd:fd,
+          file:file,
+          default_content:content,
+          content:content,
+          msg:'file created/opened.',
+          loops: loops
+        })
+      }else{
+        reject(`could not open ${file}.`)
+      }
+    })
+  })
+}
+
+function write(obj){
+  return new Promise((resolve,reject)=>{
+    obj.msg = 'file written to using our looping function';
+    fs.write(obj.fd, `${obj.content+'\n'}`, e=>{
+      if(!e) resolve(obj)
+      else reject(`could not write to ${obj.file}`)
+    })
+  })
+}
